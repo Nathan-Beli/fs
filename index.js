@@ -4,9 +4,15 @@ const {
     ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField 
 } = require('discord.js');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent
+    ] 
+});
 
-// Configuration
+// --- CONFIGURATION ---
 const CONFIG = {
     FR: {
         channels: ['1511527048932491384', '1511527053864730667', '1511527057967022240', '1511527062375235634'],
@@ -22,61 +28,70 @@ const CONFIG = {
     }
 };
 
-client.once('ready', async () => {
-    console.log(`Bot prêt : ${client.user.tag}`);
+client.once('ready', () => {
+    console.log(`✅ Bot connecté : ${client.user.tag}`);
 });
 
-// Écoute des interactions (clics sur les boutons)
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isButton()) return;
-    if (!interaction.customId.startsWith('ticket_')) return;
-
-    const lang = interaction.customId.split('_')[1]; // FR ou EN
-    const guild = interaction.guild;
-    const category = interaction.channel.parentId;
-
-    // Création du canal
-    const ticketChannel = await guild.channels.create({
-        name: `ticket-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        parent: category,
-        permissionOverwrites: [
-            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-            { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
-        ]
-    });
-
-    await interaction.reply({ content: `Ticket créé : ${ticketChannel}`, ephemeral: true });
-    
-    // Message dans le nouveau ticket
-    ticketChannel.send(`Bienvenue ${interaction.user}, un membre du staff va arriver sous peu.`);
-    
-    // Log
-    const logChan = guild.channels.cache.get(CONFIG[lang].logChannel);
-    if (logChan) logChan.send(`Nouveau ticket créé par ${interaction.user.tag} dans ${ticketChannel.name}`);
-});
-
-// Commande pour envoyer les panels (ex: !setup)
+// --- COMMANDE SETUP ---
 client.on('messageCreate', async message => {
     if (message.content === '!setup') {
-        Object.keys(CONFIG).forEach(lang => {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
+        for (const lang in CONFIG) {
+            const config = CONFIG[lang];
             const embed = new EmbedBuilder()
-                .setTitle(CONFIG[lang].title)
+                .setTitle(config.title)
                 .setDescription("Cliquez sur le bouton ci-dessous pour ouvrir un ticket.")
                 .setColor(0x0099FF);
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`ticket_${lang}`)
-                    .setLabel(CONFIG[lang].label)
+                    .setLabel(config.label)
                     .setStyle(ButtonStyle.Primary)
             );
 
-            CONFIG[lang].channels.forEach(async chanId => {
-                const channel = message.guild.channels.cache.get(chanId);
-                if (channel) await channel.send({ embeds: [embed], components: [row] });
-            });
+            for (const chanId of config.channels) {
+                try {
+                    const channel = await client.channels.fetch(chanId);
+                    await channel.send({ embeds: [embed], components: [row] });
+                    console.log(`Panel ${lang} envoyé dans ${chanId}`);
+                } catch (err) {
+                    console.error(`Erreur sur le canal ${chanId}:`, err);
+                }
+            }
+        }
+    }
+});
+
+// --- GESTION DES TICKETS ---
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton() || !interaction.customId.startsWith('ticket_')) return;
+
+    const lang = interaction.customId.split('_')[1];
+    const guild = interaction.guild;
+    const user = interaction.user;
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+        const ticketChannel = await guild.channels.create({
+            name: `ticket-${user.username}`,
+            type: ChannelType.GuildText,
+            parent: interaction.channel.parentId,
+            permissionOverwrites: [
+                { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] }
+            ]
         });
+
+        await interaction.editReply({ content: `✅ Ticket créé : ${ticketChannel}` });
+        ticketChannel.send(`Bonjour ${user}, un membre du staff vous répondra dès que possible.`);
+
+        const logChan = await guild.channels.fetch(CONFIG[lang].logChannel);
+        logChan.send(`🎫 **Nouveau ticket**\nCréateur: ${user.tag}\nSalon: ${ticketChannel}`);
+    } catch (err) {
+        interaction.editReply({ content: "❌ Une erreur est survenue lors de la création du ticket." });
     }
 });
 
