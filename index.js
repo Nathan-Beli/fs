@@ -1,12 +1,28 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField } = require('discord.js');
+const { 
+    Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
+    ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, 
+    MessageFlags 
+} = require('discord.js');
 const http = require('http');
 
-// Serveur pour garder le bot actif sur Render
-http.createServer((req, res) => res.end('Bot Online')).listen(process.env.PORT || 3000);
+// 1. Serveur HTTP pour Render
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => res.end('Bot Online')).listen(PORT);
+
+// 2. Boucle d'auto-ping pour éviter la mise en veille
+setInterval(() => {
+    http.get(`https://fs-mzcd.onrender.com`, (res) => {
+        console.log(`Ping auto : ${res.statusCode}`);
+    }).on('error', (e) => console.error(`Erreur de ping : ${e.message}`));
+}, 5 * 60 * 1000); // Toutes les 5 minutes
 
 const client = new Client({ 
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent
+    ] 
 });
 
 const ROLES = { staff: '1511885579975921816' };
@@ -40,9 +56,9 @@ client.on('interactionCreate', async interaction => {
 
     if (action === 'open') {
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-        if (existing) return interaction.reply({ content: lang === 'FR' ? "❌ Ticket déjà ouvert." : "❌ Ticket already open.", ephemeral: true });
+        if (existing) return interaction.reply({ content: lang === 'FR' ? "❌ Ticket déjà ouvert." : "❌ Ticket already open.", flags: MessageFlags.Ephemeral });
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`,
@@ -67,18 +83,19 @@ client.on('interactionCreate', async interaction => {
         await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
         
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel);
-        logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
+        if (logChan) logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
+        
         await interaction.editReply({ content: `✅ Ticket : ${channel}` });
     }
 
     if (interaction.customId === 'close_ticket') {
-        await interaction.reply("Suppression...");
+        await interaction.reply({ content: "Suppression du ticket dans 5 secondes...", flags: MessageFlags.Ephemeral });
         setTimeout(() => interaction.channel.delete().catch(console.error), 5000);
     }
 });
 
 client.on('messageCreate', async message => {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+    if (!message.member?.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
     if (message.content === '!setup' || message.content === '!support') {
         const isSetup = message.content === '!setup';
@@ -91,7 +108,10 @@ client.on('messageCreate', async message => {
             for (const id of targets) {
                 try {
                     const chan = await client.channels.fetch(id);
-                    await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
+                    await chan.send({ 
+                        embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], 
+                        components: [row] 
+                    });
                 } catch (err) { console.error(`Erreur sur le salon ${id}:`, err); }
             }
         }
