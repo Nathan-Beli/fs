@@ -33,6 +33,7 @@ client.on('interactionCreate', async interaction => {
     const [action, lang] = interaction.customId.split('_');
 
     // OUVERTURE
+   // OUVERTURE
     if (action === 'open') {
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
         if (existing) return interaction.reply({ content: "❌ Vous avez déjà un ticket ouvert.", ephemeral: true });
@@ -49,11 +50,20 @@ client.on('interactionCreate', async interaction => {
             ]
         });
 
+        // Création de l'Embed de règles
+        const embedRules = new EmbedBuilder()
+            .setTitle(lang === 'FR' ? "🎫 Federal Studio - Support" : "🎫 Federal Studio - Support")
+            .setDescription(CONFIG[lang].rules) // Utilise les règles définies dans votre config
+            .setColor(0x0099FF)
+            .setFooter({ text: "Federal Studio", iconURL: interaction.guild.iconURL() });
+
         const closeRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
         );
 
-        await channel.send({ content: CONFIG[lang].rules, components: [closeRow] });
+        // Envoi de l'embed + bouton dans le ticket
+        await channel.send({ embeds: [embedRules], components: [closeRow] });
+        
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel);
         logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
         await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
