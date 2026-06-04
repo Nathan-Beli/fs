@@ -15,16 +15,24 @@ const CONFIG = {
         supportChannel: '1511527043697741836',
         logChannel: '1511527076996583458',
         rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos (Véhicule, style, texte, réf) immédiatement.",
+        title: "Support Federal Studio",
+        desc: "Cliquez sur le bouton ci-dessous pour ouvrir un ticket.",
         label: "Ouvrir un ticket",
-        logMsg: "Nouveau ticket créé par"
+        logMsg: "Nouveau ticket créé par",
+        supTitle: "Informations Support",
+        supDesc: "Nos designers et staff sont à votre écoute ici."
     },
     EN: {
         channels: ['1511532622956986500', '1511532626039799901', '1511532630158610715', '1511532635082592267'],
         supportChannel: '1511532619307946097',
         logChannel: '1511532647078297830',
         rules: ":one: One ticket per order.\n:two: No spamming.\n:three: Respect the staff.\n:four: Provide clear info (Vehicle, style, text, ref) immediately.",
+        title: "Federal Studio Support",
+        desc: "Click the button below to open a ticket.",
         label: "Open a ticket",
-        logMsg: "New ticket created by"
+        logMsg: "New ticket created by",
+        supTitle: "Support Information",
+        supDesc: "Our designers and staff are here to help you."
     }
 };
 
@@ -36,7 +44,7 @@ client.on('interactionCreate', async interaction => {
 
     if (action === 'open') {
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-        if (existing) return interaction.reply({ content: "❌ Ticket déjà ouvert.", ephemeral: true });
+        if (existing) return interaction.reply({ content: lang === 'FR' ? "❌ Ticket déjà ouvert." : "❌ Ticket already open.", ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
         
@@ -58,18 +66,17 @@ client.on('interactionCreate', async interaction => {
             .setColor(0x0099FF);
 
         const closeRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('close_ticket').setLabel(lang === 'FR' ? 'Fermer / Close' : 'Close Ticket').setStyle(ButtonStyle.Danger)
         );
 
         await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.designer}> <@&${ROLES.staff}>`, embeds: [embedRules], components: [closeRow] });
-        
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel);
         logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
-        await interaction.editReply({ content: `✅ Ticket : ${channel}` });
+        await interaction.editReply({ content: lang === 'FR' ? `✅ Ticket : ${channel}` : `✅ Ticket : ${channel}` });
     }
 
     if (interaction.customId === 'close_ticket') {
-        await interaction.reply("Suppression dans 5 secondes...");
+        await interaction.reply("Suppression...");
         setTimeout(() => interaction.channel.delete().catch(console.error), 5000);
     }
 });
@@ -77,17 +84,17 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.content === '!setup' && message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
         for (const lang in CONFIG) {
-            // Panel Ticket
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`open_${lang}`).setLabel(CONFIG[lang].label).setStyle(ButtonStyle.Primary)
             );
+            // Panels
             for (const id of CONFIG[lang].channels) {
                 const chan = await client.channels.fetch(id);
-                await chan.send({ embeds: [new EmbedBuilder().setTitle("Support").setDescription("Cliquez pour ouvrir un ticket")], components: [row] });
+                await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
             }
-            // Embed Support info
+            // Support Info
             const supChan = await client.channels.fetch(CONFIG[lang].supportChannel);
-            await supChan.send({ embeds: [new EmbedBuilder().setTitle("Support Info").setDescription("Besoin d'aide ? Nos designers et staff sont là pour vous.")] });
+            await supChan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].supTitle).setDescription(CONFIG[lang].supDesc).setColor(0x00FF00)] });
         }
     }
 });
