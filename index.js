@@ -38,6 +38,7 @@ const CONFIG = {
 
 const ROLES = { designer: '1511885388002758778', staff: '1511885579975921816' };
 
+// --- GESTION DES TICKETS (CLIC BOUTON) ---
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
     const [action, lang] = interaction.customId.split('_');
@@ -81,21 +82,24 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+// --- COMMANDE !support ---
 client.on('messageCreate', async message => {
-    if (message.content === '!setup' && message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+    if (message.content === '!support' && message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
         for (const lang in CONFIG) {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`open_${lang}`).setLabel(CONFIG[lang].label).setStyle(ButtonStyle.Primary)
             );
-            // Panels
+            
+            // 1. Envoi du panel ticket
             for (const id of CONFIG[lang].channels) {
                 const chan = await client.channels.fetch(id);
                 await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
             }
-            // Support Info
+            // 2. Envoi de l'Embed info support
             const supChan = await client.channels.fetch(CONFIG[lang].supportChannel);
             await supChan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].supTitle).setDescription(CONFIG[lang].supDesc).setColor(0x00FF00)] });
         }
+        message.reply("✅ Panels de support et de tickets envoyés.");
     }
 });
 
