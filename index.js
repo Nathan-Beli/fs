@@ -2,14 +2,14 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField } = require('discord.js');
 const http = require('http');
 
-// Garder le bot actif sur Render
+// Serveur pour garder le bot actif sur Render
 http.createServer((req, res) => res.end('Bot Online')).listen(process.env.PORT || 3000);
 
 const client = new Client({ 
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
 });
 
-const ROLES = { designer: '1511885388002758778', staff: '1511885579975921816' };
+const ROLES = { staff: '1511885579975921816' };
 
 const CONFIG = {
     FR: {
@@ -51,7 +51,6 @@ client.on('interactionCreate', async interaction => {
             permissionOverwrites: [
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
                 { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                { id: ROLES.designer, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
                 { id: ROLES.staff, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
             ]
         });
@@ -65,7 +64,8 @@ client.on('interactionCreate', async interaction => {
             new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
         );
 
-        await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.designer}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
+        await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
+        
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel);
         logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
         await interaction.editReply({ content: `✅ Ticket : ${channel}` });
@@ -89,13 +89,14 @@ client.on('messageCreate', async message => {
             
             const targets = isSetup ? CONFIG[lang].orderChannels : [CONFIG[lang].supportChannel];
             for (const id of targets) {
-                const chan = await client.channels.fetch(id);
-                await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
+                try {
+                    const chan = await client.channels.fetch(id);
+                    await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
+                } catch (err) { console.error(`Erreur sur le salon ${id}:`, err); }
             }
         }
         message.reply(`✅ Panneaux ${isSetup ? 'Setup' : 'Support'} envoyés.`);
     }
 });
 
-client.login(process.env.TOKEN);
 client.login(process.env.TOKEN);
