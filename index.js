@@ -6,16 +6,15 @@ const {
 } = require('discord.js');
 const http = require('http');
 
-// 1. Serveur HTTP pour Render
+// 1. Serveur HTTP pour Render + Boucle Anti-Veille
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => res.end('Bot Online')).listen(PORT);
 
-// 2. Boucle d'auto-ping pour éviter la mise en veille
 setInterval(() => {
     http.get(`https://fs-mzcd.onrender.com`, (res) => {
         console.log(`Ping auto : ${res.statusCode}`);
     }).on('error', (e) => console.error(`Erreur de ping : ${e.message}`));
-}, 5 * 60 * 1000); // Toutes les 5 minutes
+}, 5 * 60 * 1000); 
 
 const client = new Client({ 
     intents: [
@@ -25,7 +24,13 @@ const client = new Client({
     ] 
 });
 
-const ROLES = { staff: '1511885579975921816' };
+// Configuration des Rôles
+const ROLES = { 
+    staff: '1511885579975921816',
+    fr: '1512224304534655157',
+    en: '1511885388002758778',
+    bilingue: '1512224349246197880'
+};
 
 const CONFIG = {
     FR: {
@@ -60,6 +65,10 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+        // Logique dynamique des rôles
+        const rolesToAllow = [ROLES.staff, ROLES.bilingue];
+        rolesToAllow.push(lang === 'FR' ? ROLES.fr : ROLES.en);
+
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`,
             type: ChannelType.GuildText,
@@ -67,7 +76,10 @@ client.on('interactionCreate', async interaction => {
             permissionOverwrites: [
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
                 { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                { id: ROLES.staff, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+                ...rolesToAllow.map(roleId => ({
+                    id: roleId,
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+                }))
             ]
         });
 
