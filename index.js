@@ -2,7 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField } = require('discord.js');
 const http = require('http');
 
-// Serveur HTTP pour Render (évite l'erreur "No open ports")
+// Serveur pour garder le bot actif sur Render
 http.createServer((req, res) => res.end('Bot Online')).listen(process.env.PORT || 3000);
 
 const client = new Client({ 
@@ -12,31 +12,31 @@ const client = new Client({
 const CONFIG = {
     FR: {
         channels: ['1511527048932491384', '1511527053864730667', '1511527057967022240', '1511527062375235634'],
+        supportChannel: '1511527043697741836',
         logChannel: '1511527076996583458',
-        rules: ":ticket:┃**Règlement des Tickets — Federal Studio**\n\n:pushpin: Afin de garder un support organisé, merci de respecter les règles suivantes :\n\n:one: Un ticket par commande (ne pas en ouvrir plusieurs).\n:two: Pas de spam ni de pings abusifs.\n:three: Respectez les designers et le staff.\n:four: Donnez vos infos (Véhicule, style, texte, référence) immédiatement.\n:five: Soyez patients.\n:six: Un ticket peut être fermé si la commande est terminée ou après inactivité.",
+        rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos (Véhicule, style, texte, réf) immédiatement.",
         label: "Ouvrir un ticket",
         logMsg: "Nouveau ticket créé par"
     },
     EN: {
         channels: ['1511532622956986500', '1511532626039799901', '1511532630158610715', '1511532635082592267'],
+        supportChannel: '1511532619307946097',
         logChannel: '1511532647078297830',
-        rules: ":ticket:┃**Ticket Rules — Federal Studio**\n\n:pushpin: To keep support organized, please respect the following rules:\n\n:one: One ticket per order (do not open multiple).\n:two: No spamming or excessive pings.\n:three: Respect designers and staff.\n:four: Provide clear info (Vehicle, style, text, reference) immediately.\n:five: Please be patient.\n:six: Tickets may be closed when orders are completed or after inactivity.",
+        rules: ":one: One ticket per order.\n:two: No spamming.\n:three: Respect the staff.\n:four: Provide clear info (Vehicle, style, text, ref) immediately.",
         label: "Open a ticket",
         logMsg: "New ticket created by"
     }
 };
 
-client.once('ready', () => console.log(`✅ Bot connecté : ${client.user.tag}`));
+const ROLES = { designer: '1511885388002758778', staff: '1511885579975921816' };
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
     const [action, lang] = interaction.customId.split('_');
 
-    // OUVERTURE
-   // OUVERTURE
     if (action === 'open') {
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-        if (existing) return interaction.reply({ content: "❌ Vous avez déjà un ticket ouvert.", ephemeral: true });
+        if (existing) return interaction.reply({ content: "❌ Ticket déjà ouvert.", ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
         
@@ -46,32 +46,30 @@ client.on('interactionCreate', async interaction => {
             parent: interaction.channel.parentId,
             permissionOverwrites: [
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+                { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+                { id: ROLES.designer, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+                { id: ROLES.staff, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
             ]
         });
 
-        // Création de l'Embed de règles
         const embedRules = new EmbedBuilder()
-            .setTitle(lang === 'FR' ? "🎫 Federal Studio - Support" : "🎫 Federal Studio - Support")
-            .setDescription(CONFIG[lang].rules) // Utilise les règles définies dans votre config
-            .setColor(0x0099FF)
-            .setFooter({ text: "Federal Studio", iconURL: interaction.guild.iconURL() });
+            .setTitle(lang === 'FR' ? "🎫 Règlement du Ticket" : "🎫 Ticket Rules")
+            .setDescription(CONFIG[lang].rules)
+            .setColor(0x0099FF);
 
         const closeRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
         );
 
-        // Envoi de l'embed + bouton dans le ticket
-        await channel.send({ embeds: [embedRules], components: [closeRow] });
+        await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.designer}> <@&${ROLES.staff}>`, embeds: [embedRules], components: [closeRow] });
         
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel);
         logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
-        await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
+        await interaction.editReply({ content: `✅ Ticket : ${channel}` });
     }
 
-    // FERMETURE
     if (interaction.customId === 'close_ticket') {
-        await interaction.reply("Le ticket sera supprimé dans 5 secondes...");
+        await interaction.reply("Suppression dans 5 secondes...");
         setTimeout(() => interaction.channel.delete().catch(console.error), 5000);
     }
 });
@@ -79,13 +77,17 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.content === '!setup' && message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
         for (const lang in CONFIG) {
+            // Panel Ticket
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`open_${lang}`).setLabel(CONFIG[lang].label).setStyle(ButtonStyle.Primary)
             );
             for (const id of CONFIG[lang].channels) {
                 const chan = await client.channels.fetch(id);
-                await chan.send({ embeds: [new EmbedBuilder().setTitle("Support Federal Studio").setDescription("Cliquez ci-dessous pour ouvrir un ticket.")], components: [row] });
+                await chan.send({ embeds: [new EmbedBuilder().setTitle("Support").setDescription("Cliquez pour ouvrir un ticket")], components: [row] });
             }
+            // Embed Support info
+            const supChan = await client.channels.fetch(CONFIG[lang].supportChannel);
+            await supChan.send({ embeds: [new EmbedBuilder().setTitle("Support Info").setDescription("Besoin d'aide ? Nos designers et staff sont là pour vous.")] });
         }
     }
 });
