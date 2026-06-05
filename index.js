@@ -85,7 +85,7 @@ client.on('interactionCreate', async interaction => {
         // Logs personnalisés
         const logEmbed = new EmbedBuilder()
             .setTitle("🎫 Ticket ouvert")
-            .setColor(0x0099FF)
+            .setColor(#b79a5e)
             .addFields(
                 { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
                 { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
