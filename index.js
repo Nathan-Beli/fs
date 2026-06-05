@@ -85,7 +85,14 @@ client.on('interactionCreate', async interaction => {
         // Logs personnalisés
         const logEmbed = new EmbedBuilder()
             .setTitle("🎫 Ticket ouvert")
+                    // Logs personnalisés
+        const logEmbed = new EmbedBuilder()
+            .setTitle("🎫 Ticket ouvert")
             .setColor(#b79a5e)
+            .addFields(
+                { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+                { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
+                { name: "Salon", value: `${channel}`, inline: false }
             .addFields(
                 { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
                 { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
