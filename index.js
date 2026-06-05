@@ -6,16 +6,15 @@ const {
 } = require('discord.js');
 const http = require('http');
 
-// 1. Serveur HTTP pour Render + Boucle Anti-Veille
+// --- SERVEUR HTTP MINIMALISTE POUR RENDER ---
+// Répond immédiatement pour éviter les timeouts 502/504
 const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => res.end('Bot Online')).listen(PORT);
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot Online');
+}).listen(PORT, () => console.log(`Serveur de maintien actif sur le port ${PORT}`));
 
-setInterval(() => {
-    http.get(`https://fs-mzcd.onrender.com`, (res) => {
-        console.log(`Ping auto : ${res.statusCode}`);
-    }).on('error', (e) => console.error(`Erreur de ping : ${e.message}`));
-}, 5 * 60 * 1000); 
-
+// --- CONFIGURATION ---
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds, 
@@ -24,7 +23,6 @@ const client = new Client({
     ] 
 });
 
-// Configuration des Rôles
 const ROLES = { 
     staff: '1511885579975921816',
     fr: '1512224304534655157',
@@ -55,6 +53,7 @@ const CONFIG = {
     }
 };
 
+// --- LOGIQUE DES TICKETS ---
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
     const [action, lang] = interaction.customId.split('_');
@@ -65,9 +64,7 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        // Logique dynamique des rôles
-        const rolesToAllow = [ROLES.staff, ROLES.bilingue];
-        rolesToAllow.push(lang === 'FR' ? ROLES.fr : ROLES.en);
+        const rolesToAllow = [ROLES.staff, ROLES.bilingue, (lang === 'FR' ? ROLES.fr : ROLES.en)];
 
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`,
@@ -76,10 +73,7 @@ client.on('interactionCreate', async interaction => {
             permissionOverwrites: [
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
                 { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                ...rolesToAllow.map(roleId => ({
-                    id: roleId,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
-                }))
+                ...rolesToAllow.map(roleId => ({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }))
             ]
         });
 
@@ -94,10 +88,10 @@ client.on('interactionCreate', async interaction => {
 
         await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
         
-        const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel);
+        const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel).catch(() => null);
         if (logChan) logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
         
-        await interaction.editReply({ content: `✅ Ticket : ${channel}` });
+        await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
     }
 
     if (interaction.customId === 'close_ticket') {
@@ -106,28 +100,22 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+// --- COMMANDE SETUP ---
 client.on('messageCreate', async message => {
     if (!message.member?.permissions.has(PermissionsBitField.Flags.Administrator)) return;
-
     if (message.content === '!setup' || message.content === '!support') {
         const isSetup = message.content === '!setup';
         for (const lang in CONFIG) {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`open_${lang}`).setLabel(CONFIG[lang].label).setStyle(ButtonStyle.Primary)
             );
-            
             const targets = isSetup ? CONFIG[lang].orderChannels : [CONFIG[lang].supportChannel];
             for (const id of targets) {
-                try {
-                    const chan = await client.channels.fetch(id);
-                    await chan.send({ 
-                        embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], 
-                        components: [row] 
-                    });
-                } catch (err) { console.error(`Erreur sur le salon ${id}:`, err); }
+                const chan = await client.channels.fetch(id).catch(() => null);
+                if (chan) await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
             }
         }
-        message.reply(`✅ Panneaux ${isSetup ? 'Setup' : 'Support'} envoyés.`);
+        message.reply(`✅ Panneaux envoyés.`);
     }
 });
 
