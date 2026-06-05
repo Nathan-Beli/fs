@@ -24,7 +24,8 @@ const ROLES = {
     staff: '1511885579975921816',
     fr: '1512224304534655157',
     en: '1511885388002758778',
-    bilingue: '1512224349246197880'
+    bilingue: '1512224349246197880',
+    extra: '1512228013457018910'
 };
 
 const CONFIG = {
@@ -58,7 +59,7 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const rolesToAllow = [ROLES.staff, ROLES.bilingue, (lang === 'FR' ? ROLES.fr : ROLES.en)];
+        const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, (lang === 'FR' ? ROLES.fr : ROLES.en)];
 
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`,
@@ -80,7 +81,11 @@ client.on('interactionCreate', async interaction => {
             new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
         );
 
-        await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
+        await channel.send({ 
+            content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
+            embeds: [embed], 
+            components: [closeRow] 
+        });
         
         const logEmbed = new EmbedBuilder()
             .setTitle(lang === 'FR' ? "🎫 Ticket ouvert" : "🎫 Ticket Opened")
