@@ -74,7 +74,7 @@ client.on('interactionCreate', async interaction => {
         const embed = new EmbedBuilder()
             .setTitle(lang === 'FR' ? "🎫 Règlement du Ticket" : "🎫 Ticket Rules")
             .setDescription(CONFIG[lang].rules)
-            .setColor(0x0099FF);
+            .setColor(0xb79a5e); // Couleur harmonisée
 
         const closeRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
@@ -82,17 +82,9 @@ client.on('interactionCreate', async interaction => {
 
         await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
         
-        // Logs personnalisés
         const logEmbed = new EmbedBuilder()
             .setTitle("🎫 Ticket ouvert")
-                    // Logs personnalisés
-        const logEmbed = new EmbedBuilder()
-            .setTitle("🎫 Ticket ouvert")
-            .setColor(#b79a5e)
-            .addFields(
-                { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
-                { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
-                { name: "Salon", value: `${channel}`, inline: false }
+            .setColor(0xb79a5e) // Couleur harmonisée
             .addFields(
                 { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
                 { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
@@ -124,7 +116,7 @@ client.on('messageCreate', async message => {
             const targets = isSetup ? CONFIG[lang].orderChannels : [CONFIG[lang].supportChannel];
             for (const id of targets) {
                 const chan = await client.channels.fetch(id).catch(() => null);
-                if (chan) await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0x0099FF)], components: [row] });
+                if (chan) await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0xb79a5e)], components: [row] }); // Couleur harmonisée
             }
         }
         message.reply(`✅ Panneaux envoyés.`);
