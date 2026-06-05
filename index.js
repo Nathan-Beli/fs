@@ -6,15 +6,12 @@ const {
 } = require('discord.js');
 const http = require('http');
 
-// --- SERVEUR HTTP MINIMALISTE POUR RENDER ---
-// Répond immédiatement pour éviter les timeouts 502/504
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Bot Online');
 }).listen(PORT, () => console.log(`Serveur de maintien actif sur le port ${PORT}`));
 
-// --- CONFIGURATION ---
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds, 
@@ -38,7 +35,6 @@ const CONFIG = {
         title: "Support Federal Studio",
         desc: "Cliquez ci-dessous pour ouvrir un ticket.",
         label: "Ouvrir un ticket",
-        logMsg: "Nouveau ticket créé par",
         rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
     },
     EN: {
@@ -48,12 +44,10 @@ const CONFIG = {
         title: "Federal Studio Support",
         desc: "Click below to open a ticket.",
         label: "Open a ticket",
-        logMsg: "New ticket created by",
         rules: ":one: One ticket per order.\n:two: No spamming.\n:three: Respect the staff.\n:four: Provide clear info immediately."
     }
 };
 
-// --- LOGIQUE DES TICKETS ---
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
     const [action, lang] = interaction.customId.split('_');
@@ -88,8 +82,20 @@ client.on('interactionCreate', async interaction => {
 
         await channel.send({ content: `<@${interaction.user.id}> <@&${ROLES.staff}>`, embeds: [embed], components: [closeRow] });
         
+        // Logs personnalisés
+        const logEmbed = new EmbedBuilder()
+            .setTitle("🎫 Ticket ouvert")
+            .setColor(0x0099FF)
+            .addFields(
+                { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+                { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
+                { name: "Salon", value: `${channel}`, inline: false }
+            )
+            .setFooter({ text: "Federal Studio • Agence de design professionnelle" })
+            .setTimestamp();
+
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel).catch(() => null);
-        if (logChan) logChan.send(`${CONFIG[lang].logMsg} ${interaction.user} : ${channel}`);
+        if (logChan) logChan.send({ embeds: [logEmbed] });
         
         await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
     }
@@ -100,7 +106,6 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// --- COMMANDE SETUP ---
 client.on('messageCreate', async message => {
     if (!message.member?.permissions.has(PermissionsBitField.Flags.Administrator)) return;
     if (message.content === '!setup' || message.content === '!support') {
