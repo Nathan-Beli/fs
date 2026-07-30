@@ -27,7 +27,7 @@ const ROLES = {
     en: '1511885388002758778',
     bilingue: '1512224349246197880',
     extra: '1512228013457018910',
-    verification: '1532365439928107038' // Rôle requis pour ouvrir un ticket
+    verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
 };
 
 const VOICE_CHANNEL_ID = '1532388090008572066'; // Salon vocal du compteur de membres
@@ -73,7 +73,6 @@ async function updateMemberCountVoice() {
 client.once('ready', async () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
     await updateMemberCountVoice();
-    // Met à jour le compteur toutes les 10 minutes
     setInterval(updateMemberCountVoice, 10 * 60 * 1000);
 });
 
@@ -82,10 +81,10 @@ client.on('interactionCreate', async interaction => {
     const [action, lang] = interaction.customId.split('_');
 
     if (action === 'open') {
-        // 1. Vérifie si l'utilisateur possède le rôle de vérification requis
+        // Vérifie si le membre possède le rôle requis obligatoirement
         if (!interaction.member.roles.cache.has(ROLES.verification)) {
             return interaction.reply({ 
-                content: lang === 'FR' ? "❌ Il faut se vérifier avant de pouvoir ouvrir un ticket !" : "❌ You need to verify yourself before opening a ticket!", 
+                content: lang === 'FR' ? "❌ Il faut se vérifier pour pouvoir ouvrir un ticket !" : "❌ You need to verify yourself to open a ticket!", 
                 flags: MessageFlags.Ephemeral 
             });
         }
