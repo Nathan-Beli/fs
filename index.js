@@ -16,7 +16,8 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
     ] 
 });
 
@@ -25,8 +26,11 @@ const ROLES = {
     fr: '1512224304534655157',
     en: '1511885388002758778',
     bilingue: '1512224349246197880',
-    extra: '1512228013457018910'
+    extra: '1512228013457018910',
+    verification: '1532365439928107038' // Rôle requis pour ouvrir un ticket
 };
+
+const VOICE_CHANNEL_ID = '1532388090008572066'; // Salon vocal du compteur de membres
 
 const CONFIG = {
     FR: {
@@ -49,11 +53,43 @@ const CONFIG = {
     }
 };
 
+// Fonction pour mettre à jour le salon vocal (Membres sans les bots)
+async function updateMemberCountVoice() {
+    for (const [guildId, guild] of client.guilds.cache) {
+        try {
+            await guild.members.fetch();
+            const humanCount = guild.members.cache.filter(member => !member.user.bot).size;
+            const voiceChannel = await client.channels.fetch(VOICE_CHANNEL_ID).catch(() => null);
+            
+            if (voiceChannel && voiceChannel.type === ChannelType.GuildVoice) {
+                await voiceChannel.setName(`Membres : ${humanCount}`);
+            }
+        } catch (error) {
+            console.error(`Erreur lors de la mise à jour du salon vocal :`, error);
+        }
+    }
+}
+
+client.once('ready', async () => {
+    console.log(`Connecté en tant que ${client.user.tag}`);
+    await updateMemberCountVoice();
+    // Met à jour le compteur toutes les 10 minutes
+    setInterval(updateMemberCountVoice, 10 * 60 * 1000);
+});
+
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
     const [action, lang] = interaction.customId.split('_');
 
     if (action === 'open') {
+        // 1. Vérifie si l'utilisateur possède le rôle de vérification requis
+        if (!interaction.member.roles.cache.has(ROLES.verification)) {
+            return interaction.reply({ 
+                content: lang === 'FR' ? "❌ Il faut se vérifier avant de pouvoir ouvrir un ticket !" : "❌ You need to verify yourself before opening a ticket!", 
+                flags: MessageFlags.Ephemeral 
+            });
+        }
+
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
         if (existing) return interaction.reply({ content: lang === 'FR' ? "❌ Ticket déjà ouvert." : "❌ Ticket already open.", flags: MessageFlags.Ephemeral });
 
@@ -86,7 +122,7 @@ client.on('interactionCreate', async interaction => {
             embeds: [embed], 
             components: [closeRow] 
         });
-        
+         
         const logEmbed = new EmbedBuilder()
             .setTitle(lang === 'FR' ? "🎫 Ticket ouvert" : "🎫 Ticket Opened")
             .setColor(0xb79a5e)
@@ -100,7 +136,7 @@ client.on('interactionCreate', async interaction => {
 
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel).catch(() => null);
         if (logChan) logChan.send({ embeds: [logEmbed] });
-        
+         
         await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
     }
 
