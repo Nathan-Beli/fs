@@ -24,7 +24,6 @@ const client = new Client({
 const ROLES = { 
     staff: '1511885579975921816',
     fr: '1512224304534655157',
-    en: '1511885388002758778',
     bilingue: '1512224349246197880',
     extra: '1512228013457018910',
     verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
@@ -41,15 +40,6 @@ const CONFIG = {
         desc: "Cliquez ci-dessous pour ouvrir un ticket.",
         label: "Ouvrir un ticket",
         rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
-    },
-    EN: {
-        orderChannels: ['1511532622956986500', '1511532626039799901', '1511532630158610715', '1511532635082592267'],
-        supportChannel: '1511532619307946097',
-        logChannel: '1511532647078297830',
-        title: "Design Studio Support",
-        desc: "Click below to open a ticket.",
-        label: "Open a ticket",
-        rules: ":one: One ticket per order.\n:two: No spamming.\n:three: Respect the staff.\n:four: Provide clear info immediately."
     }
 };
 
@@ -84,17 +74,17 @@ client.on('interactionCreate', async interaction => {
         // Vérifie si le membre possède le rôle requis obligatoirement
         if (!interaction.member.roles.cache.has(ROLES.verification)) {
             return interaction.reply({ 
-                content: lang === 'FR' ? "❌ Il faut se vérifier pour pouvoir ouvrir un ticket !" : "❌ You need to verify yourself to open a ticket!", 
+                content: "❌ Il faut se vérifier pour pouvoir ouvrir un ticket !", 
                 flags: MessageFlags.Ephemeral 
             });
         }
 
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-        if (existing) return interaction.reply({ content: lang === 'FR' ? "❌ Ticket déjà ouvert." : "❌ Ticket already open.", flags: MessageFlags.Ephemeral });
+        if (existing) return interaction.reply({ content: "❌ Ticket déjà ouvert.", flags: MessageFlags.Ephemeral });
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, (lang === 'FR' ? ROLES.fr : ROLES.en)];
+        const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.fr];
 
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`,
@@ -108,12 +98,12 @@ client.on('interactionCreate', async interaction => {
         });
 
         const embed = new EmbedBuilder()
-            .setTitle(lang === 'FR' ? "🎫 Règlement du Ticket" : "🎫 Ticket Rules")
+            .setTitle("🎫 Règlement du Ticket")
             .setDescription(CONFIG[lang].rules)
             .setColor(0xb79a5e);
 
         const closeRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer').setStyle(ButtonStyle.Danger)
         );
 
         await channel.send({ 
@@ -123,12 +113,12 @@ client.on('interactionCreate', async interaction => {
         });
          
         const logEmbed = new EmbedBuilder()
-            .setTitle(lang === 'FR' ? "🎫 Ticket ouvert" : "🎫 Ticket Opened")
+            .setTitle("🎫 Ticket ouvert")
             .setColor(0xb79a5e)
             .addFields(
-                { name: lang === 'FR' ? "Membre" : "Member", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
-                { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
-                { name: lang === 'FR' ? "Salon" : "Channel", value: `${channel}`, inline: false }
+                { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+                { name: "Type", value: "Support Client (FR)", inline: false },
+                { name: "Salon", value: `${channel}`, inline: false }
             )
             .setFooter({ text: "Design Studio • Agence de design professionnelle" })
             .setTimestamp();
