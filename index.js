@@ -23,9 +23,9 @@ const client = new Client({
 
 const ROLES = { 
     staff: '1511885579975921816',
-    fr: '1512224304534655157',
-    en: '1511885388002758778',
-    bilingue: '1512224349246197880',
+    fr: '1512224304534655157',        // designer francais
+    en: '1511885388002758778',        // Desginer anglais
+    bilingue: '1512224349246197880',  // Designer bilingue
     extra: '1512228013457018910',
     verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
 };
@@ -33,24 +33,13 @@ const ROLES = {
 const VOICE_CHANNEL_ID = '1532388090008572066'; // Salon vocal du compteur de membres
 
 const CONFIG = {
-    FR: {
-        orderChannels: ['1511527048932491384', '1511527053864730667', '1511527057967022240', '1511527062375235634'],
-        supportChannel: '1511527043697741836',
-        logChannel: '1511527076996583458',
-        title: "Support Design Studio",
-        desc: "Cliquez ci-dessous pour ouvrir un ticket.",
-        label: "Ouvrir un ticket",
-        rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
-    },
-    EN: {
-        orderChannels: ['1511532622956986500', '1511532626039799901', '1511532630158610715', '1511532635082592267'],
-        supportChannel: '1511532619307946097',
-        logChannel: '1511532647078297830',
-        title: "Design Studio Support",
-        desc: "Click below to open a ticket.",
-        label: "Open a ticket",
-        rules: ":one: One ticket per order.\n:two: No spamming.\n:three: Respect the staff.\n:four: Provide clear info immediately."
-    }
+    orderChannels: ['1511527048932491384', '1511527053864730667', '1511527057967022240', '1511527062375235634'],
+    supportChannel: '1511527043697741836',
+    logChannel: '1511527076996583458',
+    title: "Support Design Studio",
+    desc: "Cliquez ci-dessous pour ouvrir un ticket.",
+    label: "Ouvrir un ticket",
+    rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
 };
 
 // Fonction pour mettre à jour le salon vocal (Membres sans les bots)
@@ -78,23 +67,22 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
-    const [action, lang] = interaction.customId.split('_');
 
-    if (action === 'open') {
+    if (interaction.customId === 'open_ticket') {
         // Vérifie si le membre possède le rôle requis obligatoirement
         if (!interaction.member.roles.cache.has(ROLES.verification)) {
             return interaction.reply({ 
-                content: lang === 'FR' ? "❌ Il faut se vérifier pour pouvoir ouvrir un ticket !" : "❌ You need to verify yourself to open a ticket!", 
+                content: "❌ Il faut se vérifier pour pouvoir ouvrir un ticket !", 
                 flags: MessageFlags.Ephemeral 
             });
         }
 
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-        if (existing) return interaction.reply({ content: lang === 'FR' ? "❌ Ticket déjà ouvert." : "❌ Ticket already open.", flags: MessageFlags.Ephemeral });
+        if (existing) return interaction.reply({ content: "❌ Ticket déjà ouvert.", flags: MessageFlags.Ephemeral });
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, (lang === 'FR' ? ROLES.fr : ROLES.en)];
+        const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.fr];
 
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`,
@@ -108,8 +96,8 @@ client.on('interactionCreate', async interaction => {
         });
 
         const embed = new EmbedBuilder()
-            .setTitle(lang === 'FR' ? "🎫 Règlement du Ticket" : "🎫 Ticket Rules")
-            .setDescription(CONFIG[lang].rules)
+            .setTitle("🎫 Règlement du Ticket")
+            .setDescription(CONFIG.rules)
             .setColor(0xb79a5e);
 
         const closeRow = new ActionRowBuilder().addComponents(
@@ -123,17 +111,17 @@ client.on('interactionCreate', async interaction => {
         });
          
         const logEmbed = new EmbedBuilder()
-            .setTitle(lang === 'FR' ? "🎫 Ticket ouvert" : "🎫 Ticket Opened")
+            .setTitle("🎫 Ticket ouvert")
             .setColor(0xb79a5e)
             .addFields(
-                { name: lang === 'FR' ? "Membre" : "Member", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
-                { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
-                { name: lang === 'FR' ? "Salon" : "Channel", value: `${channel}`, inline: false }
+                { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+                { name: "Type", value: "Support Client (FR)", inline: false },
+                { name: "Salon", value: `${channel}`, inline: false }
             )
             .setFooter({ text: "Design Studio • Agence de design professionnelle" })
             .setTimestamp();
 
-        const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel).catch(() => null);
+        const logChan = await interaction.guild.channels.fetch(CONFIG.logChannel).catch(() => null);
         if (logChan) logChan.send({ embeds: [logEmbed] });
          
         await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
@@ -149,15 +137,13 @@ client.on('messageCreate', async message => {
     if (!message.member?.permissions.has(PermissionsBitField.Flags.Administrator)) return;
     if (message.content === '!setup' || message.content === '!support') {
         const isSetup = message.content === '!setup';
-        for (const lang in CONFIG) {
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`open_${lang}`).setLabel(CONFIG[lang].label).setStyle(ButtonStyle.Primary)
-            );
-            const targets = isSetup ? CONFIG[lang].orderChannels : [CONFIG[lang].supportChannel];
-            for (const id of targets) {
-                const chan = await client.channels.fetch(id).catch(() => null);
-                if (chan) await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG[lang].title).setDescription(CONFIG[lang].desc).setColor(0xb79a5e)], components: [row] });
-            }
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('open_ticket').setLabel(CONFIG.label).setStyle(ButtonStyle.Primary)
+        );
+        const targets = isSetup ? CONFIG.orderChannels : [CONFIG.supportChannel];
+        for (const id of targets) {
+            const chan = await client.channels.fetch(id).catch(() => null);
+            if (chan) await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG.title).setDescription(CONFIG.desc).setColor(0xb79a5e)], components: [row] });
         }
         message.reply(`✅ Panneaux envoyés.`);
     }
