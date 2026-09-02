@@ -37,7 +37,7 @@ const CONFIG = {
         orderChannels: ['1511527048932491384', '1511527053864730667', '1511527057967022240', '1511527062375235634'],
         supportChannel: '1511527043697741836',
         logChannel: '1511527076996583458',
-        title: "Support Federal Studio",
+        title: "Support Design Studio",
         desc: "Cliquez ci-dessous pour ouvrir un ticket.",
         label: "Ouvrir un ticket",
         rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
@@ -46,7 +46,7 @@ const CONFIG = {
         orderChannels: ['1511532622956986500', '1511532626039799901', '1511532630158610715', '1511532635082592267'],
         supportChannel: '1511532619307946097',
         logChannel: '1511532647078297830',
-        title: "Federal Studio Support",
+        title: "Design Studio Support",
         desc: "Click below to open a ticket.",
         label: "Open a ticket",
         rules: ":one: One ticket per order.\n:two: No spamming.\n:three: Respect the staff.\n:four: Provide clear info immediately."
@@ -130,7 +130,7 @@ client.on('interactionCreate', async interaction => {
                 { name: "Type", value: lang === 'FR' ? "Support Client (FR)" : "Customer Support (EN)", inline: false },
                 { name: lang === 'FR' ? "Salon" : "Channel", value: `${channel}`, inline: false }
             )
-            .setFooter({ text: "Federal Studio • Agence de design professionnelle" })
+            .setFooter({ text: "Design Studio • Agence de design professionnelle" })
             .setTimestamp();
 
         const logChan = await interaction.guild.channels.fetch(CONFIG[lang].logChannel).catch(() => null);
