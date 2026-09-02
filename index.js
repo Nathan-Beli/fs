@@ -84,47 +84,55 @@ client.on('interactionCreate', async interaction => {
 
         const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.fr];
 
-        const channel = await interaction.guild.channels.create({
-            name: `ticket-${interaction.user.username}`,
-            type: ChannelType.GuildText,
-            parent: interaction.channel.parentId,
-            permissionOverwrites: [
-                { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                ...rolesToAllow.map(roleId => ({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }))
-            ]
-        });
+        // Récupère la catégorie du salon où se trouve le panneau
+        const categoryId = interaction.channel.parentId;
 
-        const embed = new EmbedBuilder()
-            .setTitle("🎫 Règlement du Ticket")
-            .setDescription(CONFIG.rules)
-            .setColor(0xb79a5e);
+        try {
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${interaction.user.username}`,
+                type: ChannelType.GuildText,
+                parent: categoryId || null, // Place le ticket dans la même catégorie que le panneau
+                permissionOverwrites: [
+                    { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                    { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+                    ...rolesToAllow.map(roleId => ({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }))
+                ]
+            });
 
-        const closeRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
-        );
+            const embed = new EmbedBuilder()
+                .setTitle("🎫 Règlement du Ticket")
+                .setDescription(CONFIG.rules)
+                .setColor(0xb79a5e);
 
-        await channel.send({ 
-            content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
-            embeds: [embed], 
-            components: [closeRow] 
-        });
-         
-        const logEmbed = new EmbedBuilder()
-            .setTitle("🎫 Ticket ouvert")
-            .setColor(0xb79a5e)
-            .addFields(
-                { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
-                { name: "Type", value: "Support Client (FR)", inline: false },
-                { name: "Salon", value: `${channel}`, inline: false }
-            )
-            .setFooter({ text: "Design Studio • Agence de design professionnelle" })
-            .setTimestamp();
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
+            );
 
-        const logChan = await interaction.guild.channels.fetch(CONFIG.logChannel).catch(() => null);
-        if (logChan) logChan.send({ embeds: [logEmbed] });
-         
-        await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
+            await channel.send({ 
+                content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
+                embeds: [embed], 
+                components: [closeRow] 
+            });
+             
+            const logEmbed = new EmbedBuilder()
+                .setTitle("🎫 Ticket ouvert")
+                .setColor(0xb79a5e)
+                .addFields(
+                    { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+                    { name: "Type", value: "Support Client (FR)", inline: false },
+                    { name: "Salon", value: `${channel}`, inline: false }
+                )
+                .setFooter({ text: "Design Studio • Agence de design professionnelle" })
+                .setTimestamp();
+
+            const logChan = await interaction.guild.channels.fetch(CONFIG.logChannel).catch(() => null);
+            if (logChan) logChan.send({ embeds: [logEmbed] });
+             
+            await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
+        } catch (error) {
+            console.error("Erreur création ticket:", error);
+            await interaction.editReply({ content: "❌ Une erreur s'est produite lors de la création du ticket. Vérifiez les permissions du bot." });
+        }
     }
 
     if (interaction.customId === 'close_ticket') {
