@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const http = require('http');
 
+// Serveur HTTP pour maintenir le bot éveillé (ex: Render, Replit, Koyeb)
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -21,19 +22,27 @@ const client = new Client({
     ] 
 });
 
+// Configuration des IDs des Rôles
 const ROLES = { 
     staff: '1511885579975921816',
-    fr: '1512224304534655157',        // designer francais
-    en: '1511885388002758778',        // Desginer anglais
+    fr: '1512224304534655157',        // Designer français
+    en: '1511885388002758778',        // Designer anglais
     bilingue: '1512224349246197880',  // Designer bilingue
     extra: '1512228013457018910',
     verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
 };
 
-const VOICE_CHANNEL_ID = '1532388090008572066'; // Salon vocal du compteur de membres
+// ID du salon vocal pour le compteur de membres
+const VOICE_CHANNEL_ID = '1532388090008572066'; 
 
+// Configuration des Salons et Textes
 const CONFIG = {
-    orderChannels: ['1511527048932491384', '1511527053864730667', '1511527057967022240', '1511527062375235634'],
+    orderChannels: [
+        '1511527048932491384', 
+        '1511527053864730667', 
+        '1511527057967022240', 
+        '1511527062375235634'
+    ],
     supportChannel: '1511527043697741836',
     logChannel: '1511527076996583458',
     title: "Support Design Studio",
@@ -42,7 +51,7 @@ const CONFIG = {
     rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
 };
 
-// Fonction pour mettre à jour le salon vocal (Membres sans les bots)
+// Fonction de mise à jour du salon vocal (Comptage des humains uniquement)
 async function updateMemberCountVoice() {
     for (const [guildId, guild] of client.guilds.cache) {
         try {
@@ -59,17 +68,21 @@ async function updateMemberCountVoice() {
     }
 }
 
+// Événement : Lancement du bot
 client.once('ready', async () => {
-    console.log(`Connecté en tant que ${client.user.tag}`);
+    console.log(`✅ Connecté en tant que ${client.user.tag}`);
     await updateMemberCountVoice();
-    setInterval(updateMemberCountVoice, 10 * 60 * 1000);
+    setInterval(updateMemberCountVoice, 10 * 60 * 1000); // Mise à jour toutes les 10 minutes
 });
 
+// Événement : Gestion des Boutons
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
+    // Bouton d'ouverture de ticket
     if (interaction.customId === 'open_ticket') {
-        // Vérifie si le membre possède le rôle requis obligatoirement
+        
+        // 1. Vérification du rôle requis
         if (!interaction.member.roles.cache.has(ROLES.verification)) {
             return interaction.reply({ 
                 content: "❌ Il faut se vérifier pour pouvoir ouvrir un ticket !", 
@@ -77,84 +90,133 @@ client.on('interactionCreate', async interaction => {
             });
         }
 
+        // 2. Vérification si un ticket existe déjà
         const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-        if (existing) return interaction.reply({ content: "❌ Ticket déjà ouvert.", flags: MessageFlags.Ephemeral });
+        if (existing) {
+            return interaction.reply({ 
+                content: "❌ Vous avez déjà un ticket ouvert.", 
+                flags: MessageFlags.Ephemeral 
+            });
+        }
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const rolesToAllow = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.fr];
+        // 3. Filtrage des rôles valides existants sur le serveur
+        const targetRoleIds = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.fr];
+        const validRoles = targetRoleIds.filter(roleId => interaction.guild.roles.cache.has(roleId));
 
-        // Récupère la catégorie du salon où se trouve le panneau
+        // 4. Récupération de la catégorie parente du salon où se trouve le panneau
         const categoryId = interaction.channel.parentId;
 
         try {
+            // Création du salon textuel dans la même catégorie
             const channel = await interaction.guild.channels.create({
                 name: `ticket-${interaction.user.username}`,
                 type: ChannelType.GuildText,
-                parent: categoryId || null, // Place le ticket dans la même catégorie que le panneau
+                parent: categoryId || null,
                 permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                    ...rolesToAllow.map(roleId => ({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }))
+                    { 
+                        id: interaction.guild.id, 
+                        deny: [PermissionsBitField.Flags.ViewChannel] 
+                    },
+                    { 
+                        id: interaction.user.id, 
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] 
+                    },
+                    ...validRoles.map(roleId => ({ 
+                        id: roleId, 
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] 
+                    }))
                 ]
             });
 
+            // Embed du règlement dans le ticket
             const embed = new EmbedBuilder()
                 .setTitle("🎫 Règlement du Ticket")
                 .setDescription(CONFIG.rules)
                 .setColor(0xb79a5e);
 
+            // Bouton de fermeture du ticket
             const closeRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('close_ticket').setLabel('Fermer / Close').setStyle(ButtonStyle.Danger)
+                new ButtonBuilder()
+                    .setCustomId('close_ticket')
+                    .setLabel('Fermer le ticket')
+                    .setStyle(ButtonStyle.Danger)
             );
 
+            // Envoi du message d'accueil et des mentions dans le ticket
             await channel.send({ 
                 content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
                 embeds: [embed], 
                 components: [closeRow] 
             });
              
+            // Envoi du log d'ouverture
             const logEmbed = new EmbedBuilder()
                 .setTitle("🎫 Ticket ouvert")
                 .setColor(0xb79a5e)
                 .addFields(
                     { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
-                    { name: "Type", value: "Support Client (FR)", inline: false },
+                    { name: "Type", value: "Support Client", inline: false },
                     { name: "Salon", value: `${channel}`, inline: false }
                 )
-                .setFooter({ text: "Design Studio • Agence de design professionnelle" })
+                .setFooter({ text: "Design Studio • Agence de design" })
                 .setTimestamp();
 
             const logChan = await interaction.guild.channels.fetch(CONFIG.logChannel).catch(() => null);
             if (logChan) logChan.send({ embeds: [logEmbed] });
              
-            await interaction.editReply({ content: `✅ Ticket créé : ${channel}` });
+            await interaction.editReply({ content: `✅ Ticket créé avec succès : ${channel}` });
+
         } catch (error) {
-            console.error("Erreur création ticket:", error);
-            await interaction.editReply({ content: "❌ Une erreur s'est produite lors de la création du ticket. Vérifiez les permissions du bot." });
+            console.error("❌ ERREUR LORS DE LA CRÉATION DU TICKET :", error);
+            await interaction.editReply({ 
+                content: `❌ Impossible de créer le ticket : ${error.message}` 
+            });
         }
     }
 
+    // Bouton de fermeture de ticket
     if (interaction.customId === 'close_ticket') {
-        await interaction.reply({ content: "Suppression du ticket dans 5 secondes...", flags: MessageFlags.Ephemeral });
+        await interaction.reply({ 
+            content: "🔒 Suppression du ticket dans 5 secondes...", 
+            flags: MessageFlags.Ephemeral 
+        });
         setTimeout(() => interaction.channel.delete().catch(console.error), 5000);
     }
 });
 
+// Événement : Commandes Administrateur (!setup et !support)
 client.on('messageCreate', async message => {
     if (!message.member?.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
     if (message.content === '!setup' || message.content === '!support') {
         const isSetup = message.content === '!setup';
+
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('open_ticket').setLabel(CONFIG.label).setStyle(ButtonStyle.Primary)
+            new ButtonBuilder()
+                .setCustomId('open_ticket')
+                .setLabel(CONFIG.label)
+                .setStyle(ButtonStyle.Primary)
         );
+
+        const embedPanel = new EmbedBuilder()
+            .setTitle(CONFIG.title)
+            .setDescription(CONFIG.desc)
+            .setColor(0xb79a5e);
+
         const targets = isSetup ? CONFIG.orderChannels : [CONFIG.supportChannel];
+
         for (const id of targets) {
             const chan = await client.channels.fetch(id).catch(() => null);
-            if (chan) await chan.send({ embeds: [new EmbedBuilder().setTitle(CONFIG.title).setDescription(CONFIG.desc).setColor(0xb79a5e)], components: [row] });
+            if (chan) {
+                await chan.send({ embeds: [embedPanel], components: [row] });
+            }
         }
-        message.reply(`✅ Panneaux envoyés.`);
+
+        message.reply(`✅ Panneau(x) envoyé(s) avec succès.`);
     }
 });
 
+// Connexion du bot avec le Token
 client.login(process.env.TOKEN);
