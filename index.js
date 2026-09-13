@@ -22,12 +22,11 @@ const client = new Client({
     ] 
 });
 
-// Configuration des IDs des Rôles
+// Configuration des IDs des Rôles (Seul le rôle Canada/FR à été conservé pour la région)
 const ROLES = { 
     staff: '1511885579975921816',
-    fr: '1512224304534655157',        // Designer français
-    en: '1511885388002758778',        // Designer anglais
-    bilingue: '1512224349246197880',  // Designer bilingue
+    ca: '1512224304534655157',           // Designer Canada / FR
+    bilingue: '1512224349246197880',     // Designer bilingue
     extra: '1512228013457018910',
     verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
 };
@@ -45,7 +44,7 @@ const CONFIG = {
     ],
     supportChannel: '1511527043697741836',
     logChannel: '1511527076996583458',
-    title: "Support Design Studio",
+    title: "Support Design Studio (Canada)",
     desc: "Cliquez ci-dessous pour ouvrir un ticket.",
     label: "Ouvrir un ticket",
     rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
@@ -101,8 +100,8 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        // 3. Filtrage des rôles valides existants sur le serveur
-        const targetRoleIds = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.fr];
+        // 3. Filtrage des rôles valides existants sur le serveur (Canada / Bilingue uniquement)
+        const targetRoleIds = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.ca];
         const validRoles = targetRoleIds.filter(roleId => interaction.guild.roles.cache.has(roleId));
 
         // 4. Récupération de la catégorie parente du salon où se trouve le panneau
@@ -157,7 +156,7 @@ client.on('interactionCreate', async interaction => {
                 .setColor(0xb79a5e)
                 .addFields(
                     { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
-                    { name: "Type", value: "Support Client", inline: false },
+                    { name: "Type", value: "Support Client (Canada)", inline: false },
                     { name: "Salon", value: `${channel}`, inline: false }
                 )
                 .setFooter({ text: "Design Studio • Agence de design" })
