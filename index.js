@@ -36,7 +36,7 @@ const ROLES = {
 // ID du salon vocal pour le compteur de membres
 const VOICE_CHANNEL_ID = '1532388090008572066'; 
 
-// Configuration des Salons et Textes
+// Configuration des Salons, Textes et Bannière
 const CONFIG = {
     orderChannels: [
         '1511527048932491384', 
@@ -50,8 +50,9 @@ const CONFIG = {
     desc: "Cliquez ci-dessous pour ouvrir un ticket.",
     label: "Ouvrir un ticket",
     rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
-    // Optionnel : collez votre lien d'image direct ici ou définissez BANNER_URL dans le .env
-    bannerUrl: process.env.BANNER_URL || null 
+    
+    // COLLE VOTRE LIEN DE BANNIÈRE DISCORD ENTRE LES GUILLEMETS CI-DESSOUS :
+    bannerUrl: process.env.BANNER_URL || "https://cdn.discordapp.com/attachments/VOTRE_CANAL/VOTRE_IMAGE.png"
 };
 
 // Fonction de mise à jour du salon vocal (Comptage des humains uniquement)
@@ -145,19 +146,19 @@ client.on('interactionCreate', async interaction => {
                 files: []
             };
 
-            // Gestion prioritaire de la bannière : URL distante OU Fichier local sécurisé
+            // Traitement de l'image de bannière
             const localBannerPath = path.join(__dirname, 'banniere.png');
 
-            if (CONFIG.bannerUrl) {
-                // Utilisation de l'URL HTTPS externe
+            if (CONFIG.bannerUrl && CONFIG.bannerUrl.startsWith('http')) {
+                // Priorité 1 : Utilisation du lien HTTPS direct
                 embed.setImage(CONFIG.bannerUrl);
             } else if (fs.existsSync(localBannerPath)) {
-                // Utilisation du fichier local s'il existe à la racine
+                // Priorité 2 : Fichier local si présent à la racine
                 const banner = new AttachmentBuilder(localBannerPath, { name: 'banniere.png' });
                 embed.setImage('attachment://banniere.png');
                 sendPayload.files.push(banner);
             } else {
-                console.warn("⚠️ Attention : Aucune image trouvée (ni BANNER_URL définie, ni fichier 'banniere.png' local).");
+                console.warn("⚠️ Aucune bannière valide configurée.");
             }
 
             // Bouton de fermeture du ticket
