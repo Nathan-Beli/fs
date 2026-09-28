@@ -46,12 +46,16 @@ const CONFIG = {
     ],
     supportChannel: '1511527043697741836',
     logChannel: '1511527076996583458',
-    title: "Support Design Studio",
+    defaultTitle: "Support Design Studio",
     desc: "Cliquez ci-dessous pour ouvrir un ticket.",
     label: "Ouvrir un ticket",
     rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
     
-    // Lien HTTP optionnel si vous n'utilisez pas de fichier local banniere.png
+    // Titres personnalisés par ID de salon
+    customTitles: {
+        '1511527048932491384': "Commande Design Studio"
+    },
+
     bannerUrl: process.env.BANNER_URL || ""
 };
 
@@ -63,7 +67,7 @@ function attachBanner(embed) {
     const files = [];
 
     if (fs.existsSync(localBannerPath)) {
-        // Option 1 : Fichier local "banniere.png" à la racine du projet
+        // Option 1 : Fichier local "banniere.png"
         const banner = new AttachmentBuilder(localBannerPath, { name: 'banniere.png' });
         embed.setImage('attachment://banniere.png');
         files.push(banner);
@@ -129,11 +133,11 @@ client.on('interactionCreate', async interaction => {
         const targetRoleIds = [ROLES.staff, ROLES.bilingue, ROLES.extra, ROLES.ca];
         const validRoles = targetRoleIds.filter(roleId => interaction.guild.roles.cache.has(roleId));
 
-        // 4. Récupération de la catégorie parente du salon où se trouve le panneau
+        // 4. Récupération de la catégorie parente
         const categoryId = interaction.channel.parentId;
 
         try {
-            // Création du salon textuel dans la même catégorie
+            // Création du salon textuel
             const channel = await interaction.guild.channels.create({
                 name: `ticket-${interaction.user.username}`,
                 type: ChannelType.GuildText,
@@ -230,18 +234,21 @@ client.on('messageCreate', async message => {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        const embedPanel = new EmbedBuilder()
-            .setTitle(CONFIG.title)
-            .setDescription(CONFIG.desc)
-            .setColor(0xb79a5e);
-
-        const bannerFiles = attachBanner(embedPanel);
-
         const targets = isSetup ? CONFIG.orderChannels : [CONFIG.supportChannel];
 
         for (const id of targets) {
             const chan = await client.channels.fetch(id).catch(() => null);
             if (chan) {
+                // Définition du titre spécifique selon le salon
+                const panelTitle = CONFIG.customTitles[id] || CONFIG.defaultTitle;
+
+                const embedPanel = new EmbedBuilder()
+                    .setTitle(panelTitle)
+                    .setDescription(CONFIG.desc)
+                    .setColor(0xb79a5e);
+
+                const bannerFiles = attachBanner(embedPanel);
+
                 await chan.send({ embeds: [embedPanel], components: [row], files: bannerFiles });
             }
         }
