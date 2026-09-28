@@ -2,7 +2,7 @@ require('dotenv').config();
 const { 
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
     ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, 
-    MessageFlags 
+    MessageFlags, AttachmentBuilder 
 } = require('discord.js');
 const http = require('http');
 
@@ -25,7 +25,7 @@ const client = new Client({
 // Configuration des IDs des Rôles (Seul le rôle Canada/FR à été conservé pour la région)
 const ROLES = { 
     staff: '1511885579975921816',
-    ca: '1512224304534655157',           // Designer Canada / FR
+    ca: '1512224304534655157',       // Designer Canada / FR
     bilingue: '1512224349246197880',     // Designer bilingue
     extra: '1512228013457018910',
     verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
@@ -129,11 +129,15 @@ client.on('interactionCreate', async interaction => {
                 ]
             });
 
-            // Embed du règlement dans le ticket
+            // Chargement du fichier banniere.png
+            const banner = new AttachmentBuilder('./banniere.png');
+
+            // Embed du règlement dans le ticket avec l'image attachée
             const embed = new EmbedBuilder()
                 .setTitle("🎫 Règlement du Ticket")
                 .setDescription(CONFIG.rules)
-                .setColor(0xb79a5e);
+                .setColor(0xb79a5e)
+                .setImage('attachment://banniere.png');
 
             // Bouton de fermeture du ticket
             const closeRow = new ActionRowBuilder().addComponents(
@@ -143,10 +147,11 @@ client.on('interactionCreate', async interaction => {
                     .setStyle(ButtonStyle.Danger)
             );
 
-            // Envoi du message d'accueil et des mentions dans le ticket
+            // Envoi du message d'accueil, des mentions et de l'image dans le ticket
             await channel.send({ 
                 content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
                 embeds: [embed], 
+                files: [banner],
                 components: [closeRow] 
             });
              
