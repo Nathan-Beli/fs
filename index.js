@@ -5,8 +5,10 @@ const {
     MessageFlags, AttachmentBuilder 
 } = require('discord.js');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
-// Serveur HTTP pour maintenir le bot éveillé (ex: Render, Replit, Koyeb)
+// Serveur HTTP pour maintenir le bot éveillé (ex: Canner, Render, Koyeb)
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -25,8 +27,8 @@ const client = new Client({
 // Configuration des IDs des Rôles
 const ROLES = { 
     staff: '1511885579975921816',
-    ca: '1512224304534655157',       // Designer
-    bilingue: '1512224349246197880',     // Designer bilingue
+    ca: '1512224304534655157',        // Designer
+    bilingue: '1512224349246197880',  // Designer bilingue
     extra: '1512228013457018910',
     verification: '1532365439928107038' // Rôle requis obligatoire pour ouvrir un ticket
 };
@@ -47,7 +49,9 @@ const CONFIG = {
     title: "Support Design Studio",
     desc: "Cliquez ci-dessous pour ouvrir un ticket.",
     label: "Ouvrir un ticket",
-    rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement."
+    rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
+    // Optionnel : collez votre lien d'image direct ici ou définissez BANNER_URL dans le .env
+    bannerUrl: process.env.BANNER_URL || null 
 };
 
 // Fonction de mise à jour du salon vocal (Comptage des humains uniquement)
@@ -129,15 +133,32 @@ client.on('interactionCreate', async interaction => {
                 ]
             });
 
-            // Chargement explicite de l'attachement
-            const banner = new AttachmentBuilder('./banniere.png', { name: 'banniere.png' });
-
-            // Embed du règlement dans le ticket
+            // Préparation de l'embed du règlement
             const embed = new EmbedBuilder()
                 .setTitle("🎫 Règlement du Ticket")
                 .setDescription(CONFIG.rules)
-                .setColor(0xb79a5e)
-                .setImage('attachment://banniere.png');
+                .setColor(0xb79a5e);
+
+            const sendPayload = {
+                content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`,
+                embeds: [embed],
+                files: []
+            };
+
+            // Gestion prioritaire de la bannière : URL distante OU Fichier local sécurisé
+            const localBannerPath = path.join(__dirname, 'banniere.png');
+
+            if (CONFIG.bannerUrl) {
+                // Utilisation de l'URL HTTPS externe
+                embed.setImage(CONFIG.bannerUrl);
+            } else if (fs.existsSync(localBannerPath)) {
+                // Utilisation du fichier local s'il existe à la racine
+                const banner = new AttachmentBuilder(localBannerPath, { name: 'banniere.png' });
+                embed.setImage('attachment://banniere.png');
+                sendPayload.files.push(banner);
+            } else {
+                console.warn("⚠️ Attention : Aucune image trouvée (ni BANNER_URL définie, ni fichier 'banniere.png' local).");
+            }
 
             // Bouton de fermeture du ticket
             const closeRow = new ActionRowBuilder().addComponents(
@@ -146,14 +167,10 @@ client.on('interactionCreate', async interaction => {
                     .setLabel('Fermer le ticket')
                     .setStyle(ButtonStyle.Danger)
             );
+            sendPayload.components = [closeRow];
 
-            // Envoi du message d'accueil, des mentions et de l'image
-            await channel.send({ 
-                content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
-                embeds: [embed], 
-                files: [banner],
-                components: [closeRow] 
-            });
+            // Envoi du message d'accueil dans le salon du ticket
+            await channel.send(sendPayload);
              
             // Envoi du log d'ouverture
             const logEmbed = new EmbedBuilder()
