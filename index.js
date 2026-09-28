@@ -8,7 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// Serveur HTTP pour maintenir le bot éveillé (ex: Canner, Render, Koyeb)
+// Serveur HTTP pour maintenir le bot éveillé (ex: Render, Koyeb)
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -51,9 +51,29 @@ const CONFIG = {
     label: "Ouvrir un ticket",
     rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
     
-    // COLLE VOTRE LIEN DE BANNIÈRE DISCORD ENTRE LES GUILLEMETS CI-DESSOUS :
-    bannerUrl: process.env.BANNER_URL || "https://cdn.discordapp.com/attachments/VOTRE_CANAL/VOTRE_IMAGE.png"
+    // Lien HTTP optionnel si vous n'utilisez pas de fichier local banniere.png
+    bannerUrl: process.env.BANNER_URL || ""
 };
+
+/**
+ * Fonction utilitaire pour attacher la bannière (locale ou distante) à un Embed
+ */
+function attachBanner(embed) {
+    const localBannerPath = path.join(__dirname, 'banniere.png');
+    const files = [];
+
+    if (fs.existsSync(localBannerPath)) {
+        // Option 1 : Fichier local "banniere.png" à la racine du projet
+        const banner = new AttachmentBuilder(localBannerPath, { name: 'banniere.png' });
+        embed.setImage('attachment://banniere.png');
+        files.push(banner);
+    } else if (CONFIG.bannerUrl && CONFIG.bannerUrl.startsWith('http')) {
+        // Option 2 : Lien URL HTTPS
+        embed.setImage(CONFIG.bannerUrl);
+    }
+
+    return files;
+}
 
 // Fonction de mise à jour du salon vocal (Comptage des humains uniquement)
 async function updateMemberCountVoice() {
@@ -140,26 +160,8 @@ client.on('interactionCreate', async interaction => {
                 .setDescription(CONFIG.rules)
                 .setColor(0xb79a5e);
 
-            const sendPayload = {
-                content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`,
-                embeds: [embed],
-                files: []
-            };
-
-            // Traitement de l'image de bannière
-            const localBannerPath = path.join(__dirname, 'banniere.png');
-
-            if (CONFIG.bannerUrl && CONFIG.bannerUrl.startsWith('http')) {
-                // Priorité 1 : Utilisation du lien HTTPS direct
-                embed.setImage(CONFIG.bannerUrl);
-            } else if (fs.existsSync(localBannerPath)) {
-                // Priorité 2 : Fichier local si présent à la racine
-                const banner = new AttachmentBuilder(localBannerPath, { name: 'banniere.png' });
-                embed.setImage('attachment://banniere.png');
-                sendPayload.files.push(banner);
-            } else {
-                console.warn("⚠️ Aucune bannière valide configurée.");
-            }
+            // Application de la bannière
+            const bannerFiles = attachBanner(embed);
 
             // Bouton de fermeture du ticket
             const closeRow = new ActionRowBuilder().addComponents(
@@ -168,7 +170,13 @@ client.on('interactionCreate', async interaction => {
                     .setLabel('Fermer le ticket')
                     .setStyle(ButtonStyle.Danger)
             );
-            sendPayload.components = [closeRow];
+
+            const sendPayload = {
+                content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`,
+                embeds: [embed],
+                components: [closeRow],
+                files: bannerFiles
+            };
 
             // Envoi du message d'accueil dans le salon du ticket
             await channel.send(sendPayload);
@@ -227,12 +235,14 @@ client.on('messageCreate', async message => {
             .setDescription(CONFIG.desc)
             .setColor(0xb79a5e);
 
+        const bannerFiles = attachBanner(embedPanel);
+
         const targets = isSetup ? CONFIG.orderChannels : [CONFIG.supportChannel];
 
         for (const id of targets) {
             const chan = await client.channels.fetch(id).catch(() => null);
             if (chan) {
-                await chan.send({ embeds: [embedPanel], components: [row] });
+                await chan.send({ embeds: [embedPanel], components: [row], files: bannerFiles });
             }
         }
 
