@@ -129,8 +129,8 @@ client.on('interactionCreate', async interaction => {
                 ]
             });
 
-            // Chargement de l'image banniere.png située à la racine du projet
-            const banner = new AttachmentBuilder('./banniere.png');
+            // Chargement explicite de l'attachement
+            const banner = new AttachmentBuilder('./banniere.png', { name: 'banniere.png' });
 
             // Embed du règlement dans le ticket
             const embed = new EmbedBuilder()
@@ -147,7 +147,7 @@ client.on('interactionCreate', async interaction => {
                     .setStyle(ButtonStyle.Danger)
             );
 
-            // Envoi du message d'accueil, des mentions et du fichier image dans le ticket
+            // Envoi du message d'accueil, des mentions et de l'image
             await channel.send({ 
                 content: `<@${interaction.user.id}> <@&${ROLES.staff}> <@&${ROLES.extra}>`, 
                 embeds: [embed], 
