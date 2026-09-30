@@ -2,7 +2,7 @@ require('dotenv').config();
 const { 
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
     ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, 
-    MessageFlags, AttachmentBuilder 
+    MessageFlags, AttachmentBuilder, REST, Routes, SlashCommandBuilder 
 } = require('discord.js');
 const http = require('http');
 const fs = require('fs');
@@ -23,6 +23,9 @@ const client = new Client({
         GatewayIntentBits.GuildMembers
     ] 
 });
+
+// Map pour stocker les timers de suppression automatique de 24h
+const activeCloseRequests = new Map();
 
 // Configuration des IDs des Rôles
 const ROLES = { 
@@ -49,7 +52,8 @@ const CONFIG = {
     defaultTitle: "Support Design Studio",
     desc: "Cliquez ci-dessous pour ouvrir un ticket.",
     label: "Ouvrir un ticket",
-    rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
+    // Retrait du :one: devant la première règle
+    rules: "Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
     
     // Titres personnalisés par ID de salon
     customTitles: {
@@ -67,12 +71,10 @@ function attachBanner(embed) {
     const files = [];
 
     if (fs.existsSync(localBannerPath)) {
-        // Option 1 : Fichier local "banniere.png"
         const banner = new AttachmentBuilder(localBannerPath, { name: 'banniere.png' });
         embed.setImage('attachment://banniere.png');
         files.push(banner);
     } else if (CONFIG.bannerUrl && CONFIG.bannerUrl.startsWith('http')) {
-        // Option 2 : Lien URL HTTPS
         embed.setImage(CONFIG.bannerUrl);
     }
 
@@ -96,15 +98,101 @@ async function updateMemberCountVoice() {
     }
 }
 
+// Enregistrement des commandes Slash (Commandes /)
+const commands = [
+    new SlashCommandBuilder()
+        .setName('closerequest')
+        .setDescription('Demande la fermeture du ticket sous 24h sans réponse.')
+        .addStringOption(option => 
+            option.setName('raison')
+                .setDescription('Raison de la demande de fermeture')
+                .setRequired(false)
+        )
+].map(command => command.toJSON());
+
 // Événement : Lancement du bot
 client.once('ready', async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
+
+    // Enregistrement de la commande /closerequest
+    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+    try {
+        console.log('🔄 Enregistrement des commandes Slash...');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands }
+        );
+        console.log('✅ Commandes Slash enregistrées avec succès.');
+    } catch (error) {
+        console.error('❌ Erreur lors de l’enregistrement des commandes Slash :', error);
+    }
+
     await updateMemberCountVoice();
     setInterval(updateMemberCountVoice, 10 * 60 * 1000); // Mise à jour toutes les 10 minutes
 });
 
-// Événement : Gestion des Boutons
+// Événement : Gestion des Interactions (Boutons + Commandes Slash)
 client.on('interactionCreate', async interaction => {
+    
+    // --- GESTION DE LA COMMANDE SLASH /closerequest ---
+    if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'closerequest') {
+
+            // Vérification si la commande est exécutée dans un ticket
+            if (!interaction.channel.name.startsWith('ticket-')) {
+                return interaction.reply({
+                    content: "❌ Cette commande peut uniquement être utilisée dans un ticket !",
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            // Vérifier s'il y a déjà un délai actif sur ce ticket
+            if (activeCloseRequests.has(interaction.channel.id)) {
+                return interaction.reply({
+                    content: "⚠️ Une demande de fermeture est déjà en cours pour ce ticket.",
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const raison = interaction.options.getString('raison') || "Aucune raison fournie.";
+
+            const embedCloseReq = new EmbedBuilder()
+                .setTitle("⚠️ Demande de fermeture du ticket")
+                .setDescription(`Un membre du staff a demandé la fermeture de ce ticket.\n\n**Raison :** ${raison}\n\n🕒 **Sans réponse ou action de votre part, ce ticket sera automatiquement supprimé dans 24 heures.**`)
+                .setColor(0xe74c3c)
+                .setTimestamp();
+
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('close_ticket')
+                    .setLabel('Fermer le ticket maintenant')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+            await interaction.reply({ embeds: [embedCloseReq], components: [closeRow] });
+
+            // Planification de la suppression automatique après 24 heures (86 400 000 ms)
+            const timeoutId = setTimeout(async () => {
+                try {
+                    const channel = await client.channels.fetch(interaction.channelId).catch(() => null);
+                    if (channel) {
+                        await channel.send("⏳ **Délai de 24h écoulé sans réponse.** Suppression du ticket...");
+                        setTimeout(() => channel.delete().catch(console.error), 3000);
+                    }
+                } catch (err) {
+                    console.error("Erreur lors de la suppression automatique du ticket :", err);
+                } finally {
+                    activeCloseRequests.delete(interaction.channelId);
+                }
+            }, 24 * 60 * 60 * 1000);
+
+            // Stockage de l'identifiant du timer
+            activeCloseRequests.set(interaction.channel.id, timeoutId);
+            return;
+        }
+    }
+
+    // --- GESTION DES BOUTONS ---
     if (!interaction.isButton()) return;
 
     // Bouton d'ouverture de ticket
@@ -212,6 +300,12 @@ client.on('interactionCreate', async interaction => {
 
     // Bouton de fermeture de ticket
     if (interaction.customId === 'close_ticket') {
+        // Annuler le timer de 24h s'il existait
+        if (activeCloseRequests.has(interaction.channel.id)) {
+            clearTimeout(activeCloseRequests.get(interaction.channel.id));
+            activeCloseRequests.delete(interaction.channel.id);
+        }
+
         await interaction.reply({ 
             content: "🔒 Suppression du ticket dans 5 secondes...", 
             flags: MessageFlags.Ephemeral 
