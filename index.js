@@ -52,8 +52,8 @@ const CONFIG = {
     defaultTitle: "Support Design Studio",
     desc: "Cliquez ci-dessous pour ouvrir un ticket.",
     label: "Ouvrir un ticket",
-    // Retrait du :one: devant la première règle
-    rules: "Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
+    // Liste numérotée avec émojis 1, 2, 3, 4
+    rules: ":one: Un ticket par commande.\n:two: Pas de spam.\n:three: Respectez le staff.\n:four: Donnez vos infos immédiatement.",
     
     // Titres personnalisés par ID de salon
     customTitles: {
@@ -156,20 +156,36 @@ client.on('interactionCreate', async interaction => {
 
             const raison = interaction.options.getString('raison') || "Aucune raison fournie.";
 
+            // Récupérer le nom de l'utilisateur à partir du nom du salon (ex: ticket-pseudo)
+            const usernameFromChannel = interaction.channel.name.replace('ticket-', '');
+            const ticketOwner = interaction.guild.members.cache.find(m => m.user.username.toLowerCase() === usernameFromChannel);
+
             const embedCloseReq = new EmbedBuilder()
                 .setTitle("⚠️ Demande de fermeture du ticket")
                 .setDescription(`Un membre du staff a demandé la fermeture de ce ticket.\n\n**Raison :** ${raison}\n\n🕒 **Sans réponse ou action de votre part, ce ticket sera automatiquement supprimé dans 24 heures.**`)
                 .setColor(0xe74c3c)
                 .setTimestamp();
 
-            const closeRow = new ActionRowBuilder().addComponents(
+            // Boutons : Fermer le ticket OU Garder ouvert
+            const closeReqRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('keep_ticket_open')
+                    .setLabel('Garder le ticket ouvert')
+                    .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                     .setCustomId('close_ticket')
                     .setLabel('Fermer le ticket maintenant')
                     .setStyle(ButtonStyle.Danger)
             );
 
-            await interaction.reply({ embeds: [embedCloseReq], components: [closeRow] });
+            // Mention du créateur du ticket dans le contenu du message
+            const mentionText = ticketOwner ? `<@${ticketOwner.id}>` : "";
+
+            await interaction.reply({ 
+                content: mentionText ? `🔔 ${mentionText}` : null,
+                embeds: [embedCloseReq], 
+                components: [closeReqRow] 
+            });
 
             // Planification de la suppression automatique après 24 heures (86 400 000 ms)
             const timeoutId = setTimeout(async () => {
@@ -194,6 +210,28 @@ client.on('interactionCreate', async interaction => {
 
     // --- GESTION DES BOUTONS ---
     if (!interaction.isButton()) return;
+
+    // Bouton : Garder le ticket ouvert
+    if (interaction.customId === 'keep_ticket_open') {
+        if (activeCloseRequests.has(interaction.channel.id)) {
+            clearTimeout(activeCloseRequests.get(interaction.channel.id));
+            activeCloseRequests.delete(interaction.channel.id);
+
+            await interaction.reply({
+                content: `✅ <@${interaction.user.id}> a annulé la demande de fermeture. Le ticket reste ouvert !`
+            });
+
+            // Désactiver les boutons sur le message de la demande de fermeture
+            if (interaction.message) {
+                await interaction.message.edit({ components: [] }).catch(() => null);
+            }
+        } else {
+            await interaction.reply({
+                content: "⚠️ Aucune demande de fermeture active à annuler.",
+                flags: MessageFlags.Ephemeral
+            });
+        }
+    }
 
     // Bouton d'ouverture de ticket
     if (interaction.customId === 'open_ticket') {
